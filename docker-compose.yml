@@ -1,0 +1,62 @@
+# ./docker-compose.yml
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ollama_models:/root/.ollama
+      - shared_data:/shared_data
+    ports:
+      - "11434:11434"
+
+  tika:
+    image: apache/tika:latest
+    container_name: tika
+    volumes:
+      - shared_data:/shared_data
+    ports:
+      - "9998:9998"
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    environment:
+      - OLLAMA_API_BASE_URL=http://ollama:11434
+      - GOOGLE_DRIVE_API_KEY=AIzaSyADcjQzajJ0orNJt-a12NFbCwPFfHTH1KU
+      - GOOGLE_DRIVE_CLIENT_ID=334557376357-6952k7rveudcmipq3qvbr40g7jdpenjo.apps.googleusercontent.com
+      - GOOGLE_DRIVE_REDIRECT_URI=http://localhost:3000
+    ports:
+      - "3000:8080"
+    depends_on:
+      - ollama
+    volumes:
+      - shared_data:/shared_data
+
+  ocr-helper:
+    build:
+      context: ./ocr-helper
+    container_name: ocr-helper
+    ports:
+      - "8000:8000"
+    depends_on:
+      - openwebui
+    volumes:
+      - shared_data:/shared_data
+
+
+
+  ingest-runner:
+    build:
+      context: ./ingest-runner
+    container_name: ingest-runner
+    volumes:
+      - shared_data:/shared_data
+    depends_on:
+      - ocr-helper
+
+volumes:
+  - shared_data:
+  - ollama_models:

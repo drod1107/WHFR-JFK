@@ -1,0 +1,6 @@
+# ./ocr-helper/requirements.txt
+fastapi
+uvicorn
+pytesseract
+opencv-python-headless
+pillow
