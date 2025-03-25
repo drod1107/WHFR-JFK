@@ -25,8 +25,7 @@ services:
     container_name: openwebui
     environment:
       - OLLAMA_API_BASE_URL=http://ollama:11434
-      - GOOGLE_DRIVE_API_KEY=AIzaSyADcjQzajJ0orNJt-a12NFbCwPFfHTH1KU
-      - GOOGLE_DRIVE_CLIENT_ID=334557376357-6952k7rveudcmipq3qvbr40g7jdpenjo.apps.googleusercontent.com
+      - 
       - GOOGLE_DRIVE_REDIRECT_URI=http://localhost:3000
     ports:
       - "3000:8080"
