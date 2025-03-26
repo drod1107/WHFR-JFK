@@ -1,6 +1,8 @@
 # ./ocr-helper/requirements.txt
+
 fastapi
 uvicorn
-pytesseract
-opencv-python-headless
+python-doctr[torch]
+easyocr
 pillow
+

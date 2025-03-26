@@ -1,11 +1,21 @@
 # ./docker-compose.yml
 services:
+  chromadb:
+    image: chromadb/chroma
+    container_name: chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./shared/chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+
   ingest-runner:
     build:
       context: ./ingest-runner
     container_name: ingest-runner
     volumes:
-      - shared_data:/shared_data
+      - ./shared:/shared
     depends_on:
       - ocr-helper
 
@@ -18,7 +28,7 @@ services:
     depends_on:
       - openwebui
     volumes:
-      - shared_data:/shared_data
+      - ./shared:/shared
 
   ollama:
     image: ollama/ollama
@@ -51,5 +61,4 @@ services:
       - ollama
 
 volumes:
-  shared_data:
   ollama_models:
