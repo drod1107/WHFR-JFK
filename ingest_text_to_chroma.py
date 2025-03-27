@@ -3,13 +3,15 @@ import uuid
 import sys
 import requests
 import chromadb
-from chromadb.config import Settings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # === CONFIG ===
 OCR_URL = "http://localhost:8000/extract_clean_text"
 OLLAMA_URL = "http://localhost:11434/api/embeddings"
-CHROMA_HOST = "localhost"
-CHROMA_PORT = 8001
+CHROMA_HOST = os.environ.get("CHROMA_HOST")
+CHROMA_PORT = int(os.environ.get("CHROMA_PORT"))
 IMAGE_PATH = os.path.abspath("shared/processed_docs/test_image.png")
 SOURCE_URL = "https://fake.url/test.pdf"
 COLLECTION_NAME = "rag-docs"
@@ -51,8 +53,7 @@ if not embedding:
 print("[3] Connecting to ChromaDB (remote via HttpClient)...")
 chroma_client = chromadb.HttpClient(
     host=CHROMA_HOST,
-    port=CHROMA_PORT,
-    settings=Settings()
+    port=CHROMA_PORT
 )
 
 print("[3] Creating or getting collection...")

@@ -1,16 +1,20 @@
 # query_chroma.py
-
 import os
 import sys
 import requests
 import chromadb
-from chromadb.config import Settings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 CHROMA_URL = "http://localhost:8001"
 OLLAMA_URL = "http://localhost:11434/api/generate"
 COLLECTION_NAME = "rag-docs"
 EMBED_MODEL = "nomic-embed-text"
-LLM_MODEL = "llama3"
+LLM_MODEL = "deepseek-r1:8b"
+CHROMA_HOST = os.environ.get("CHROMA_HOST")
+CHROMA_PORT = int(os.environ.get("CHROMA_PORT"))
+
 
 def embed_query(text):
     print("[1] Embedding query with Ollama...")
@@ -51,17 +55,9 @@ if __name__ == "__main__":
 
     print("[2] Connecting to ChromaDB...")
     chroma_client = chromadb.HttpClient(
-        host="http://localhost",
-        port=8001,
-        settings=Settings(
-            chroma_client_auth_provider="chromadb.auth.basic_authn.BasicAuthClientProvider",
-            chroma_client_auth_credentials="your_username:your_password"
-        )
+        host=CHROMA_HOST,
+        port=CHROMA_PORT
     )
-
-
-    chroma_client = chromadb.HttpClient(settings)
-
 
     print("[3] Querying ChromaDB for context...")
     collection = chroma_client.get_collection(COLLECTION_NAME)

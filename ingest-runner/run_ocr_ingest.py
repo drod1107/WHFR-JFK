@@ -1,8 +1,6 @@
 # ./ingest-runner/run_ocr_ingest.py
-import os
 import requests
 from pathlib import Path
-from PyPDF2 import PdfReader
 from pdf2image import convert_from_path
 
 # === CONFIG ===
