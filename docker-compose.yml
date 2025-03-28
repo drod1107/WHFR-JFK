@@ -53,6 +53,10 @@ services:
       context: ./rag-api
     ports:
       - "5050:5050"
+    environment:
+      - CHROMA_HOST = os.environ.get("CHROMA_HOST", "chromadb")
+      - CHROMA_PORT = os.environ.get("CHROMA_PORT", "8000")
+      - CHROMA_URL = f"http://{CHROMA_HOST}:{CHROMA_PORT}"
     depends_on:
       - chromadb
       - ollama
@@ -65,8 +69,6 @@ services:
       - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
       - GOOGLE_DRIVE_CLIENT_ID=${GOOGLE_DRIVE_CLIENT_ID}
       - GOOGLE_DRIVE_REDIRECT_URI=${GOOGLE_DRIVE_REDIRECT_URI}
-      - OPENWEBUI_DISABLE_TOOLS=true
-
     ports:
       - "3000:8080"
     depends_on:

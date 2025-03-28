@@ -1,19 +1,15 @@
 # rag_api.py
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
-import os
-from dotenv import load_dotenv
 import requests
 import chromadb
 from chromadb.config import Settings
 
-load_dotenv()
-
-CHROMA_HOST = os.environ["CHROMA_HOST"]
-CHROMA_PORT = int(os.environ["CHROMA_PORT"])
+CHROMA_HOST = "localhost"
+CHROMA_PORT = 8001
 OLLAMA_URL = "http://ollama:11434/api/generate"
 EMBED_MODEL = "nomic-embed-text"
-LLM_MODEL = "llama3"
+LLM_MODEL = "deepseek-r1:8b"
 COLLECTION_NAME = "rag-docs"
 
 app = FastAPI()
