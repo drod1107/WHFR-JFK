@@ -4,10 +4,12 @@ from pydantic import BaseModel
 import requests
 import chromadb
 from chromadb.config import Settings
+import os
 
-CHROMA_HOST = "localhost"
-CHROMA_PORT = 8001
-OLLAMA_URL = "http://ollama:11434/api/generate"
+# Use service names for internal Docker networking
+CHROMA_HOST = os.environ.get("CHROMA_HOST", "chromadb")
+CHROMA_PORT = os.environ.get("CHROMA_PORT", "8000")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434") + "/api/generate"
 EMBED_MODEL = "nomic-embed-text"
 LLM_MODEL = "deepseek-r1:8b"
 COLLECTION_NAME = "rag-docs"
@@ -20,7 +22,7 @@ class QueryRequest(BaseModel):
 @app.post("/rag")
 def rag_query(req: QueryRequest):
     # 1. Embed the query
-    embed_resp = requests.post("http://localhost:11434/api/embeddings", json={
+    embed_resp = requests.post(f"{OLLAMA_URL.replace('/generate', '/embeddings')}", json={
         "model": EMBED_MODEL,
         "prompt": req.query
     })
@@ -29,8 +31,7 @@ def rag_query(req: QueryRequest):
     # 2. Retrieve context from Chroma
     chroma_client = chromadb.HttpClient(
         host=CHROMA_HOST,
-        port=CHROMA_PORT,
-        settings=Settings()
+        port=CHROMA_PORT
     )
     collection = chroma_client.get_collection(COLLECTION_NAME)
     results = collection.query(query_embeddings=[embedding], n_results=3)
@@ -61,3 +62,7 @@ Answer:"""
         "response": final_resp.json()["response"],
         "sources": metadatas
     }
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}

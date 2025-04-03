@@ -54,8 +54,8 @@ services:
     ports:
       - "5050:5050"
     environment:
-      - CHROMA_HOST = os.environ.get("CHROMA_HOST", "chromadb")
-      - CHROMA_PORT = os.environ.get("CHROMA_PORT", "8000")
+      - CHROMA_HOST = chromadb
+      - CHROMA_PORT = 8000
       - CHROMA_URL = f"http://{CHROMA_HOST}:{CHROMA_PORT}"
     depends_on:
       - chromadb
@@ -76,6 +76,7 @@ services:
       - chromadb
     volumes:
       - ./rag_tool.py:/app/plugins/rag_tool.py
+      - ./rag_tool.json:/app/plugins/rag_tool.json
 
 volumes:
   ollama_models:

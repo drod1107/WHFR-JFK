@@ -1,17 +1,16 @@
 {
-    "name": "rag-query",
-    "description": "Perform a document-grounded RAG query",
-    "api": {
-      "type": "openapi",
-      "url": "http://localhost:5050/rag",
-      "method": "POST"
-    },
-    "parameters": {
-      "query": {
-        "type": "string",
-        "required": true,
-        "description": "The question to answer using the document knowledge base. If it is not answerable from the documents released by the white house, answer based on your pretraining data but be transparent that the information was not available through docs and that you relied on pretraining data to answer that question. If the question is unrelated to the JFK assassination, the assassination of MLK, or any peripheral subjects relating to the theories, conspiracy or otherwise, regarding such events, or the governments alleged involvement therewith, or geopolitical interconnectivity thereof, politely decline to answer and explain simply that you are designed to help the public better understand the data contained in the releaseed documents, and that you are unable to operate as a standard web chat AI agent. Politely recommend some questions that would relate instead in that case, and suggest they refer other queries to their favorite AI web search agent"
-      }
+  "name": "rag-query",
+  "description": "Perform a document-grounded RAG query",
+  "api": {
+    "type": "openapi",
+    "url": "http://rag-api:5050/rag",
+    "method": "POST"
+  },
+  "parameters": {
+    "query": {
+      "type": "string",
+      "required": true,
+      "description": "The question to answer using the document knowledge base."
     }
   }
-  
+}
