@@ -1,14 +1,20 @@
 # ./ocr-helper/main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
-from doctr.io import DocumentFile
-from doctr.models import ocr_predictor
+from PIL import Image
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+import torch
 import os
 
 app = FastAPI()
 
-# Load the DocTR OCR model once at startup
-model = ocr_predictor(pretrained=True)
+# === GPU/CPU SETUP ===
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"[INIT] Using device: {device}")
+
+# === Load TrOCR model and processor ===
+processor = TrOCRProcessor.from_pretrained("microsoft/trocr-base-handwritten")
+model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-base-handwritten").to(device)
 
 class OCRRequest(BaseModel):
     image_path: str
@@ -17,31 +23,21 @@ class OCRRequest(BaseModel):
 @app.post("/extract_clean_text")
 def extract_clean_text(data: OCRRequest):
     try:
-        # Ensure file exists
         if not os.path.exists(data.image_path):
             return {"error": f"Image not found: {data.image_path}"}
 
-        # Load image and run OCR
-        doc = DocumentFile.from_images(data.image_path)
-        result = model(doc)
+        image = Image.open(data.image_path).convert("RGB")
+        pixel_values = processor(images=image, return_tensors="pt").pixel_values.to(device)
+        generated_ids = model.generate(pixel_values)
+        text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-        # Extract text from prediction
-        json_output = result.export()
-        extracted_text = "\n".join(
-            word["value"]
-            for page in json_output["pages"]
-            for block in page["blocks"]
-            for line in block["lines"]
-            for word in line["words"]
-        )
-
-        # Heuristic for clarity estimation
-        extracted_len = len(extracted_text)
-        est_total_len = os.path.getsize(data.image_path) / 2.5  # crude guess
+        # Heuristic clarity estimation
+        extracted_len = len(text)
+        est_total_len = os.path.getsize(data.image_path) / 2.5
         clarity = round((extracted_len / est_total_len) * 100, 1)
 
         return {
-            "clean_text": extracted_text.strip(),
+            "clean_text": text.strip(),
             "clarity_percent": clarity,
             "fallback_url": data.source_url
         }

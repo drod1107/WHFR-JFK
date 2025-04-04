@@ -1,14 +1,56 @@
 # ./docker-compose.yml
 services:
+
+  postgres:
+    image: postgres:14
+    container_name: vectoradmin-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: vectoradmin
+      POSTGRES_PASSWORD: vectoradmin123
+      POSTGRES_DB: vdbms
+    ports:
+      - "5433:5432"
+    volumes:
+      - vectoradmin_pgdata:/var/lib/postgresql/data
+
   chromadb:
-    image: chromadb/chroma
+    build:
+      context: ../chroma # location of local chromadb repo folder
+      dockerfile: Dockerfile
+    image: custom-chroma
     container_name: chromadb
     ports:
-      - "8001:8000"
-    volumes:
-      - ./shared/chroma_data:/chroma/chroma
+      - "8000:8000"
     environment:
+      - CHROMA_HOST_ADDR=0.0.0.0
+      - CHROMA_HOST_PORT=8000
+      - CHROMA_WORKERS=1
+      - CHROMA_LOG_CONFIG=chromadb/log_config.yml
+      - CHROMA_TIMEOUT_KEEP_ALIVE=30
       - IS_PERSISTENT=TRUE
+      - IS_MULTI_TENANT=FALSE
+    restart: always
+
+  vectoradmin:
+    image: ghcr.io/mintplex-labs/vector-admin:latest
+    container_name: vectoradmin
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    environment:
+      - SERVER_PORT=8080
+      - JWT_SECRET=dev-mode-jwt-secret-keep-out-of-prod
+      - INNGEST_EVENT_KEY=background_workers
+      - INNGEST_SIGNING_KEY=dev-mode-signing-key
+      - INNGEST_LANDING_PAGE=true
+      - DB_TYPE=chroma
+      - DB_HOST=chromadb
+      - DB_PORT=8000
+      - DATABASE_CONNECTION_STRING=postgresql://vectoradmin:vectoradmin123@postgres:5432/vdbms
+      - DISABLE_TELEMETRY=true
+    restart: always
 
   ingest-runner:
     build:
@@ -41,12 +83,14 @@ services:
       - ollama_models:/root/.ollama
     ports:
       - "11434:11434"
+    restart: always
 
   tika:
     image: apache/tika:latest
     container_name: tika
     ports:
       - "9998:9998"
+    restart: always
 
   rag-api:
     build:
@@ -54,12 +98,13 @@ services:
     ports:
       - "5050:5050"
     environment:
-      - CHROMA_HOST = chromadb
-      - CHROMA_PORT = 8000
-      - CHROMA_URL = f"http://{CHROMA_HOST}:{CHROMA_PORT}"
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - CHROMA_URL=http://chromadb:8000
     depends_on:
       - chromadb
       - ollama
+    restart: always
 
   openwebui:
     image: ghcr.io/open-webui/open-webui:main
@@ -77,6 +122,8 @@ services:
     volumes:
       - ./rag_tool.py:/app/plugins/rag_tool.py
       - ./rag_tool.json:/app/plugins/rag_tool.json
+    restart: always
 
 volumes:
   ollama_models:
+  vectoradmin_pgdata:

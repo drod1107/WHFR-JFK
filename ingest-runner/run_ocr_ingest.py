@@ -1,11 +1,14 @@
-# ./ingest-runner/run_ocr_ingest.py
 import requests
 from pathlib import Path
 from pdf2image import convert_from_path
 import time
 import socket
+import multiprocessing
 
-def wait_for_ocr_service(host="ocr-helper", port=8000, timeout=120):
+# Global lock to be set in __main__
+lock = None
+
+def wait_for_ocr_service(host="ocr-helper", port=8000, timeout=240):
     print(f"[0] Waiting for OCR helper at {host}:{port} to be ready...")
     start = time.time()
     while time.time() - start < timeout:
@@ -25,22 +28,16 @@ OCR_HELPER_URL = "http://ocr-helper:8000/extract_clean_text"
 INPUT_DIR = Path("/shared/incoming_docs")
 OUTPUT_DIR = Path("/shared/processed_docs")
 FALLBACK_BASE_URL = "file:///mnt/data/incoming_docs"
-CHECKPOINT_FILE = OUTPUT_DIR / "checkpoint.txt"  # Persistent file to track processed PDFs
+CHECKPOINT_FILE = OUTPUT_DIR / "checkpoint.txt"
 
-# Ensure output directory exists
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Load checkpoint: a set of already processed file names.
 processed_files = set()
 if CHECKPOINT_FILE.exists():
     with open(CHECKPOINT_FILE, "r", encoding="utf-8") as cp:
         for line in cp:
             processed_files.add(line.strip())
 
-# Track results for manifest
-results = []
-
-# Convert PDF pages to images
 def convert_pdf_to_images(pdf_path):
     try:
         return convert_from_path(str(pdf_path), dpi=300, fmt='png')
@@ -48,23 +45,24 @@ def convert_pdf_to_images(pdf_path):
         print(f"[!] Failed to convert {pdf_path.name}: {e}")
         return []
 
-# Process each PDF file in the input directory
-# Using sorted order here just for consistency, though the checkpoint ensures no duplicates.
-for file_path in sorted(INPUT_DIR.glob("*")):
-    if file_path.suffix.lower() == ".pdf":
-        # Skip files that have been processed already
+def process_single_pdf(file_path: Path):
+    global lock
+    try:
         if file_path.name in processed_files:
             print(f"Skipping already processed file: {file_path.name}")
-            continue
+            return []
 
         print(f"Processing file: {file_path.name}")
         images = convert_pdf_to_images(file_path)
+        if not images:
+            return []
+
+        results = []
         for i, image in enumerate(images):
             image_filename = f"{file_path.stem}_page_{i+1}.png"
             image_path = OUTPUT_DIR / image_filename
             image.save(image_path)
 
-            # Retry OCR helper POST for each image
             for attempt in range(20):
                 try:
                     response = requests.post(OCR_HELPER_URL, json={
@@ -77,11 +75,10 @@ for file_path in sorted(INPUT_DIR.glob("*")):
                         print(f"[!] OCR helper error (status {response.status_code}): {response.text}")
                 except requests.exceptions.ConnectionError:
                     print(f"[!] OCR helper not ready (attempt {attempt + 1}/20)")
-                time.sleep(1)
+                    time.sleep(1)
             else:
                 raise RuntimeError(f"OCR helper did not respond for file {image_filename} after multiple retries")
 
-            # Parse and save OCR results
             result = response.json()
             clarity = result.get("clarity_percent", 0)
             clean_text = result.get("clean_text", "").strip()
@@ -100,15 +97,34 @@ for file_path in sorted(INPUT_DIR.glob("*")):
                 "output": str(output_txt_path)
             })
 
-        # Update checkpoint after successfully processing the entire PDF
-        with open(CHECKPOINT_FILE, "a", encoding="utf-8") as cp:
-            cp.write(f"{file_path.name}\n")
-        processed_files.add(file_path.name)
+        with lock:
+            with open(CHECKPOINT_FILE, "a", encoding="utf-8") as cp:
+                cp.write(f"{file_path.name}\n")
 
-# Save manifest of all processed pages
-manifest_path = OUTPUT_DIR / "manifest.txt"
-with open(manifest_path, "w", encoding="utf-8") as mf:
-    for entry in results:
-        mf.write(f"{entry['file']} (Page {entry['page']}): {entry['clarity_percent']}% -> {entry['output']}\n")
+        return results
 
-print(f"\n✅ Done. Manifest written to: {manifest_path}")
+    except Exception as e:
+        print(f"[!] Failed to process {file_path.name}: {e}")
+        return []
+
+if __name__ == "__main__":
+    pdfs_to_process = sorted([
+        f for f in INPUT_DIR.glob("*.pdf")
+        if f.name not in processed_files
+    ])
+
+    print(f"[Ingest] {len(pdfs_to_process)} PDFs pending OCR.")
+
+    lock = multiprocessing.Lock()
+
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        all_results = pool.map(process_single_pdf, pdfs_to_process)
+
+    results = [entry for group in all_results for entry in group]
+
+    manifest_path = OUTPUT_DIR / "manifest.txt"
+    with open(manifest_path, "w", encoding="utf-8") as mf:
+        for entry in results:
+            mf.write(f"{entry['file']} (Page {entry['page']}): {entry['clarity_percent']}% -> {entry['output']}\n")
+
+    print(f"\n✅ Done. Manifest written to: {manifest_path}")
