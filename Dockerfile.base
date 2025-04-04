@@ -1,0 +1,28 @@
+# ./Dockerfile.base
+FROM python:3.10-slim
+
+LABEL maintainer="WHFR DevOps FTW"
+
+# Step 1: System dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    build-essential \
+    libgl1 \
+    poppler-utils \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Step 2: Python dependencies (shared across services)
+COPY base-requirements.txt /tmp/
+# wheel setup for smarter dep caching
+VOLUME ["/root/.cache/pip"]
+ENV PIP_CACHE_DIR=/root/.cache/pip
+
+RUN pip install --no-cache-dir -r /tmp/base-requirements.txt
+
+# Optional Step 3: Pull Ollama models into the image
+# NOTE: You need to test this separately first. Requires Ollama in the image.
+# COPY ollama-models/ /root/.ollama/models/
+
+# Done
+WORKDIR /app

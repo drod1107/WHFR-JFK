@@ -27,7 +27,7 @@ wait_for_ocr_service()
 OCR_HELPER_URL = "http://ocr-helper:8000/extract_clean_text"
 INPUT_DIR = Path("/shared/incoming_docs")
 OUTPUT_DIR = Path("/shared/processed_docs")
-FALLBACK_BASE_URL = "file:///mnt/data/incoming_docs"
+FALLBACK_BASE_URL = "file:///shared/incoming_docs"
 CHECKPOINT_FILE = OUTPUT_DIR / "checkpoint.txt"
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

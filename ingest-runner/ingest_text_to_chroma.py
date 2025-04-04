@@ -1,58 +1,62 @@
 import os
 import uuid
-import sys
+from glob import glob
+from pathlib import Path
 import requests
 import chromadb
-from glob import glob
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # === CONFIG ===
-OCR_URL = "http://localhost:8000/extract_clean_text"
-OLLAMA_URL = "http://localhost:11434/api/embeddings"
+OLLAMA_URL = "http://ollama:11434/api/embeddings"
 CHROMA_HOST = os.environ.get("CHROMA_HOST")
 CHROMA_PORT = int(os.environ.get("CHROMA_PORT"))
 COLLECTION_NAME = "rag-docs"
-IMAGE_DIR = "shared/processed_docs"  # 👈 Folder with your PNG files
+IMAGE_DIR = "/shared/processed_docs"
+CHECKPOINT_FILE = Path(IMAGE_DIR) / "db_checkpoint.txt"
 
-# === ChromaDB Setup ===
+# === Setup ChromaDB ===
 print("[0] Connecting to ChromaDB...")
 chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
 collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
 
-# === Load all image files ===
+# === Load checkpoint ===
+processed_images = set()
+if CHECKPOINT_FILE.exists():
+    with open(CHECKPOINT_FILE, "r", encoding="utf-8") as cp:
+        processed_images = set(line.strip() for line in cp)
+
+# === Process all PNG images ===
 image_files = glob(os.path.join(IMAGE_DIR, "*.png"))
 print(f"[0] Found {len(image_files)} image(s) in {IMAGE_DIR}")
 
 for image_path in image_files:
-    print(f"\n🔄 Processing: {image_path}")
-    source_url = f"https://fake.url/{os.path.basename(image_path)}"
-
-    # === OCR Step ===
-    print("[1] Requesting OCR...")
-    ocr_payload = {
-        "image_path": os.path.abspath(image_path),
-        "source_url": source_url
-    }
-    ocr_resp = requests.post(OCR_URL, json=ocr_payload)
-
-    if ocr_resp.status_code != 200:
-        print(f"❌ OCR failed: {ocr_resp.status_code} - {ocr_resp.text}")
+    image_path = Path(image_path)
+    if image_path.name in processed_images:
+        print(f"⏭️ Skipping already pushed file: {image_path.name}")
         continue
 
-    ocr_json = ocr_resp.json()
-    ocr_text = ocr_json.get("clean_text", "").strip()
-    clarity = ocr_json.get("clarity_percent")
-    print(f"[1] OCR complete. Clarity: {clarity}%")
+    print(f"\n🔄 Processing: {image_path.name}")
+    txt_path = image_path.with_suffix(".txt")
+
+    if not txt_path.exists():
+        print(f"❌ Missing OCR text for {image_path.name}, skipping.")
+        continue
+
+    # === Read OCR text ===
+    with open(txt_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+        ocr_text = "".join(lines[3:]).strip()  # Skip metadata lines
 
     if not ocr_text:
-        print("❌ No text returned from OCR.")
+        print(f"❌ Empty OCR result in {txt_path.name}, skipping.")
         continue
 
-    # === Embedding Step ===
+    # === Get embedding from Ollama ===
     print("[2] Sending text to Ollama for embedding...")
     embed_resp = requests.post(OLLAMA_URL, json={"model": "nomic-embed-text", "prompt": ocr_text})
+
     if embed_resp.status_code != 200:
         print(f"❌ Embedding failed: {embed_resp.status_code} - {embed_resp.text}")
         continue
@@ -62,15 +66,22 @@ for image_path in image_files:
         print("❌ No embedding returned from Ollama.")
         continue
 
-    # === Upsert Step ===
+    # === Upsert into Chroma ===
     print("[3] Upserting into ChromaDB...")
     doc_id = str(uuid.uuid4())
+    source_url = f"https://fake.url/{image_path.name}"
+
     collection.add(
         ids=[doc_id],
         embeddings=[embedding],
         documents=[ocr_text],
         metadatas=[{"source": source_url}]
     )
+
+    # === Update checkpoint ===
+    with open(CHECKPOINT_FILE, "a", encoding="utf-8") as cp:
+        cp.write(f"{image_path.name}\n")
+
     print(f"✔️ Inserted document ID {doc_id}")
 
 print("\n✅ All done!")

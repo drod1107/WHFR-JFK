@@ -16,21 +16,14 @@ services:
 
   chromadb:
     build:
-      context: ../chroma # location of local chromadb repo folder
-      dockerfile: Dockerfile
-    image: custom-chroma
+      context: .
+      dockerfile: Dockerfile.chromadb
     container_name: chromadb
     ports:
       - "8000:8000"
-    environment:
-      - CHROMA_HOST_ADDR=0.0.0.0
-      - CHROMA_HOST_PORT=8000
-      - CHROMA_WORKERS=1
-      - CHROMA_LOG_CONFIG=chromadb/log_config.yml
-      - CHROMA_TIMEOUT_KEEP_ALIVE=30
-      - IS_PERSISTENT=TRUE
-      - IS_MULTI_TENANT=FALSE
-    restart: always
+    volumes:
+      - chroma-data:/chroma
+    restart: unless-stopped
 
   vectoradmin:
     image: ghcr.io/mintplex-labs/vector-admin:latest
@@ -56,8 +49,13 @@ services:
     build:
       context: ./ingest-runner
     container_name: ingest-runner
+    image: whfr_ingest-runner
     volumes:
       - ./shared:/shared
+      - pip-cache:/root/.cache/pip
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     depends_on:
       - ocr-helper
       - chromadb
@@ -65,13 +63,19 @@ services:
   ocr-helper:
     build:
       context: ./ocr-helper
+    image: whfr_ingest-runner
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]
     container_name: ocr-helper
-    ports:
-      - "8000:8000"
     depends_on:
       - openwebui
     volumes:
       - ./shared:/shared
+      - pip-cache:/root/.cache/pip
 
   ollama:
     image: ollama/ollama
@@ -84,6 +88,8 @@ services:
     ports:
       - "11434:11434"
     restart: always
+    command: >
+      sh -c "ollama pull nomic-embed-text && /bin/ollama serve"
 
   tika:
     image: apache/tika:latest
@@ -127,3 +133,5 @@ services:
 volumes:
   ollama_models:
   vectoradmin_pgdata:
+  chroma-data:
+  pip-cache:
