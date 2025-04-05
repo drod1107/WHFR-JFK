@@ -1,0 +1,7 @@
+FROM ollama/ollama
+
+# Add the custom entrypoint
+COPY entrypoint.ollama.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -63,7 +63,7 @@ services:
   ocr-helper:
     build:
       context: ./ocr-helper
-    image: whfr_ingest-runner
+    image: whfr-ocr-helper
     deploy:
       resources:
         reservations:
@@ -76,9 +76,12 @@ services:
     volumes:
       - ./shared:/shared
       - pip-cache:/root/.cache/pip
+    restart: unless-stopped
 
   ollama:
-    image: ollama/ollama
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
     container_name: ollama
     runtime: nvidia
     environment:
@@ -88,8 +91,7 @@ services:
     ports:
       - "11434:11434"
     restart: always
-    command: >
-      sh -c "ollama pull nomic-embed-text && /bin/ollama serve"
+
 
   tika:
     image: apache/tika:latest
