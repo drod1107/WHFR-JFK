@@ -1,18 +1,4 @@
-# ./docker-compose.yml
 services:
-
-  postgres:
-    image: postgres:14
-    container_name: vectoradmin-postgres
-    restart: always
-    environment:
-      POSTGRES_USER: vectoradmin
-      POSTGRES_PASSWORD: vectoradmin123
-      POSTGRES_DB: vdbms
-    ports:
-      - "5433:5432"
-    volumes:
-      - vectoradmin_pgdata:/var/lib/postgresql/data
 
   chromadb:
     build:
@@ -25,25 +11,12 @@ services:
       - chroma-data:/chroma
     restart: unless-stopped
 
-  vectoradmin:
-    image: ghcr.io/mintplex-labs/vector-admin:latest
-    container_name: vectoradmin
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    environment:
-      - SERVER_PORT=8080
-      - JWT_SECRET=dev-mode-jwt-secret-keep-out-of-prod
-      - INNGEST_EVENT_KEY=background_workers
-      - INNGEST_SIGNING_KEY=dev-mode-signing-key
-      - INNGEST_LANDING_PAGE=true
-      - DB_TYPE=chroma
-      - DB_HOST=chromadb
-      - DB_PORT=8000
-      - DATABASE_CONNECTION_STRING=postgresql://vectoradmin:vectoradmin123@postgres:5432/vdbms
-      - DISABLE_TELEMETRY=true
-    restart: always
+  whfr-base:
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+    image: whfr-base:latest
+
 
   ingest-runner:
     build:
@@ -59,6 +32,7 @@ services:
     depends_on:
       - ocr-helper
       - chromadb
+      - whfr-base
 
   ocr-helper:
     build:
@@ -72,7 +46,8 @@ services:
               capabilities: [gpu]
     container_name: ocr-helper
     depends_on:
-      - openwebui
+      - ollama
+      - whfr-base
     volumes:
       - ./shared:/shared
       - pip-cache:/root/.cache/pip
@@ -92,14 +67,6 @@ services:
       - "11434:11434"
     restart: always
 
-
-  tika:
-    image: apache/tika:latest
-    container_name: tika
-    ports:
-      - "9998:9998"
-    restart: always
-
   rag-api:
     build:
       context: ./rag-api
@@ -112,28 +79,34 @@ services:
     depends_on:
       - chromadb
       - ollama
+      - whfr-base
     restart: always
+
+  viewer-api:
+    build:
+      context: ./viewer-api
+    container_name: viewer-api
+    ports:
+      - "5051:5051"
+    volumes:
+      - ./shared:/app/shared
+    command: uvicorn main:app --host 0.0.0.0 --port 5051 --reload
+    restart: unless-stopped
+
 
   openwebui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: openwebui
     environment:
       - OLLAMA_API_BASE_URL=http://ollama:11434
-      - GOOGLE_DRIVE_API_KEY=${GOOGLE_DRIVE_API_KEY}
-      - GOOGLE_DRIVE_CLIENT_ID=${GOOGLE_DRIVE_CLIENT_ID}
-      - GOOGLE_DRIVE_REDIRECT_URI=${GOOGLE_DRIVE_REDIRECT_URI}
     ports:
       - "3000:8080"
     depends_on:
       - ollama
       - chromadb
-    volumes:
-      - ./rag_tool.py:/app/plugins/rag_tool.py
-      - ./rag_tool.json:/app/plugins/rag_tool.json
     restart: always
 
 volumes:
-  ollama_models:
-  vectoradmin_pgdata:
   chroma-data:
+  ollama_models:
   pip-cache:

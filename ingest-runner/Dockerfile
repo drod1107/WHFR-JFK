@@ -1,9 +1,7 @@
+# ingest-runner/Dockerfile
 FROM whfr-base:latest
 
 WORKDIR /ocr-helper
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 

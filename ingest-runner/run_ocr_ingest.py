@@ -80,7 +80,7 @@ def process_single_pdf(file_path):
 
         results = []
         for i, image in enumerate(images):
-            image_filename = f"{file_path.stem}_page_{i+1}.png"
+            image_filename = f"{file_path.stem}.png"
             image_path = OUTPUT_DIR / image_filename
             image.save(image_path)
 

@@ -1,19 +1,37 @@
+Here’s the updated `README.md`, fully aligned with the current working state of your WHFR stack and its roadmap:
+
+---
+
 # WHFR: Local RAG Stack with Custom Chroma, OCR, and RAG API
 
-**WHFR** is a fully containerized Retrieval-Augmented Generation (RAG) system designed for serious local-first document indexing and natural language querying. It features a custom-built Chroma vector database, OCR pipeline, ingest runner, local LLM via Ollama, and a RESTful RAG API—all optimized for privacy, transparency, and extensibility.
+**WHFR** is a fully containerized Retrieval-Augmented Generation (RAG) system designed for high-throughput, local-first document indexing and natural language querying. Built for speed, privacy, and extensibility, WHFR includes a zero-effort ingest pipeline, ChromaDB vector store, local LLM runtime, admin viewer, and full REST API interface for embedding, querying, and debugging.
 
 ---
 
 ## 🧠 Key Components
 
-- **ChromaDB** – Custom-built from source for complete dependency control (e.g., pinned Protobuf, optional hnswlib rebuild).
-- **VectorAdmin** – Visual admin interface for managing embeddings (connected to Chroma).
-- **OCR Helper** – DocTR-based FastAPI service with GPU acceleration, optimized for scanned historical docs.
-- **Ingest Runner** – FastAPI + multiprocessing pipeline with checkpointing for high-throughput ingest.
-- **RAG API** – A lean, prompt-driven REST API layer for querying indexed data.
-- **Ollama + OpenWebUI** – Local LLM runtime + chat interface, enhanced with a custom RAG plugin.
-- **Apache Tika** – For structured text extraction from non-image PDFs.
-- **PostgreSQL** – Backing store for VectorAdmin metadata.
+- **whfr-base** – Secure, unified Docker base image used by all services (based on `python:3.13-slim-bookworm`)
+- **ChromaDB** – Custom-built from source with pinned Protobuf and hnswlib rebuild, for total vector index control
+- **OCR Helper** – FastAPI + TrOCR service with GPU acceleration for scanned historical docs (image-based PDFs)
+- **Ingest Runner** – High-speed parallel ingestion pipeline (multiprocessing + checkpointed) for massive ingest runs
+- **RAG API** – FastAPI-based REST API that performs query embedding, Chroma search, and context-aware LLM generation
+- **Viewer API** – FastAPI service with searchable `.txt` previews side-by-side with the original image output
+- **Ollama** – Local LLM inference runtime for embedding and answer generation (supports Deepseek, Gemma, etc.)
+- **OpenWebUI** – Full-featured chat UI with embedded knowledgebase plugin connected to WHFR's RAG API
+- **VectorAdmin** *(optional)* – UI for inspecting Chroma vector contents
+- **Apache Tika** – Text extraction fallback for structured (non-image) PDFs
+- **PostgreSQL** – Metadata store for VectorAdmin (optional)
+
+---
+
+## 🚀 Roadmap Highlights
+
+- 🔍 **Viewer Frontend** – Live searchable GUI for browsing OCR’d text + original page image (in progress)
+- 💾 **Chunking + Re-Ranking** – Dynamic segmenting + context re-ranking for improved RAG accuracy
+- 🔐 **Access Control** – Optional login/auth layers for shared deployments
+- 📦 **Offline Ollama Model Bundles** – Support for pre-pulled Ollama model blobs in build phase
+- 📊 **Ingest Dashboard** – Progress view, failure recovery UI, and resumable batch stats
+- 🔁 **Stream-to-Ingest** – Real-time folder or S3 watcher to trigger ingestion on new file drop
 
 ---
 
@@ -26,89 +44,80 @@ git clone https://github.com/your-org/WHFR.git
 cd WHFR
 ```
 
-### 2. Build all containers
+### 2. Build everything
 
 ```bash
 docker compose build --no-cache
 ```
 
-This ensures Chroma is rebuilt from the local folder using your custom Dockerfile (Protobuf, hnswlib, etc. included).
+This will automatically build the shared `whfr-base` image, then every service that depends on it. Ollama, Chroma, OCR, and ingest will all compile from local source.
 
-### 3. Start the stack
+### 3. Start the full stack
 
 ```bash
 docker compose up
 ```
 
-All services will spin up together, including VectorAdmin at `http://localhost:8080` and OpenWebUI at `http://localhost:3000`.
+This launches all services, including:
+
+- RAG API → `http://localhost:5050`
+- Viewer API → `http://localhost:5051`
+- OpenWebUI → `http://localhost:3000`
+- ChromaDB → `http://localhost:8000`
+- VectorAdmin *(if included)* → `http://localhost:8080`
 
 ---
 
-## 📡 Query the Vector DB via RAG API
-
-Once up and running, you can query your indexed documents like this:
+## 📡 Example Query via RAG API
 
 ```bash
-curl -X POST http://localhost:5050/query \
+curl -X POST http://localhost:5050/rag \
   -H "Content-Type: application/json" \
-  -d '{"question": "What is the plaintiff arguing in the 1942 court brief?"}'
+  -d '{"query": "What is the plaintiff arguing in the 1942 court brief?"}'
 ```
 
-The RAG API uses pre-configured prompts and fetches context chunks from Chroma to pass into the LLM.
+This performs embedding, semantic search via Chroma, and answer generation via your local Ollama model.
 
 ---
 
-## 🧪 Local Development (Partial Stack)
-
-You can work on individual services independently:
-
-```bash
-# Run only the RAG API for development
-docker compose run --service-ports rag-api
-```
-
-Or develop directly against the custom Chroma build:
-
-```bash
-docker compose up chromadb
-```
-
-All containers mount a shared volume for OCR and ingestion, so you can isolate just what you need.
-
----
-
-## 📁 Folder Structure (Simplified)
+## 📂 Folder Structure (Simplified)
 
 ```bash
 WHFR/
 ├── docker-compose.yml
+├── Dockerfile.base                  # Shared base image used by all services
+├── base-requirements.txt           # Base Python deps (for whfr-base)
+├── shared/                         # OCR input/output (shared volume)
+│   ├── incoming_docs/              # Drop PDFs here to ingest
+│   └── processed_docs/             # .txt + .png outputs
 ├── rag-api/
-├── ocr-helper/
 ├── ingest-runner/
-├── shared/                 # Mounted volume for OCR and ingest
-├── chroma/                 # Custom Chroma source
-│   ├── bin/docker_entrypoint.sh
-│   └── Dockerfile
+├── ocr-helper/
+├── viewer-api/
+├── chroma/                         # Custom-built ChromaDB
 ```
 
 ---
 
-## 🔐 License
+## 🔒 Licensing
 
-This project is dual-licensed:
+### OSS Components
 
-### OSS Components:
+All open-source components (ChromaDB, Ollama, trOCR, FastAPI, etc.) retain their original licenses. See `/licenses/` if included.
 
-All open-source components (ChromaDB, DocTR, Apache Tika, Ollama, etc.) retain their original licenses as required. Attribution and license copies are included per standard OSS guidelines.
+### WHFR Custom Code
 
-### Custom Code:
-
-The following components are protected and copyright © 2025 Windrose & Company LLC:
+The following components are **copyright © 2025 Windrose & Company LLC** and not open-source:
 
 - `rag-api/`
 - `ocr-helper/`
 - `ingest-runner/`
-- `rag_tool.py` + `rag_tool.json` plugin for OpenWebUI
-- Custom prompts and ingest pipeline logic
+- `viewer-api/`
+- `rag_tool.py` + `rag_tool.json` (for OpenWebUI)
+- Custom prompts, ingest logic, and processing flows
 
-These components are **not open-source** and may not be redistributed, sublicensed, or used in commercial applications without explicit permission. Licensing for commercial use is available upon request.
+Use is permitted for personal and internal projects. For redistribution, licensing, or commercial deployment, contact Windrose & Co.
+
+---
+
+Let me know if you want a live badge system, Docker Hub push workflow, or GH Actions deployment added next.
