@@ -1,5 +1,0 @@
-# ./ingest-runner/requirements.txt
-requests
-chromadb
-pdf2image
-

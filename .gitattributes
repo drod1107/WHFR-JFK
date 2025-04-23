@@ -1,0 +1,11 @@
+# .gitattributes
+
+# Always use LF for critical file types
+*.py text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.Dockerfile text eol=lf
+Dockerfile* text eol=lf
+*.txt text eol=lf
+*.json text eol=lf

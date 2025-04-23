@@ -1,0 +1,7 @@
+# ./base-requirements.txt
+requests
+chromadb==1.0.0
+pdf2image
+pillow
+python-dotenv
+torch
